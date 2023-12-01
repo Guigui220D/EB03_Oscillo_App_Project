@@ -2,4 +2,10 @@
 <resources>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
+    <color name="sliderCursor">#FFFF0000</color>
+    <color name="sliderBar1">#FFFFFF00</color>
+    <color name="sliderBar2">#FF00FF00</color>
+    <color name="colorPrimary">#FF008800</color>
+    <color name="colorPrimaryDark">#FF004400</color>
+    <color name="colorAccent">#FF22AA22</color>
 </resources>
