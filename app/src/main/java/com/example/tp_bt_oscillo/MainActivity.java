@@ -6,6 +6,7 @@ import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
 
 import android.bluetooth.BluetoothAdapter;
@@ -16,17 +17,28 @@ import android.os.Bundle;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.widget.Button;
 import android.widget.Toast;
 import android.Manifest;
 
 public class MainActivity extends AppCompatActivity {
+
+    BTManager btManager;
+    Button testBtn;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
+        testBtn = findViewById(R.id.button);
+        testBtn.setOnClickListener((a) -> {
+            btManager.send(new byte[] { 0x0A, 100 });
+        });
         getSupportActionBar().setTitle("BT Oscilloscope App");
+
+
+        btManager = new BTManager();
     }
 
     @Override
@@ -53,6 +65,8 @@ public class MainActivity extends AppCompatActivity {
             btPermissionLauncher.launch(new String[]{ Manifest.permission.BLUETOOTH_SCAN, Manifest.permission.BLUETOOTH_CONNECT });
         } else {
             Intent intent = new Intent(MainActivity.this, BluetoothConnectActivity.class);
+
+            btManager.disconnect();
             btConnectLauncher.launch(intent);
         }
     }
@@ -104,6 +118,17 @@ public class MainActivity extends AppCompatActivity {
     private final ActivityResultLauncher<Intent> btConnectLauncher = registerForActivityResult(
             new ActivityResultContracts.StartActivityForResult(),
             o -> {
+                String chosen = o.getData().getStringExtra("chosen");
+                String id = chosen.split("\n")[1];
+                Log.i("BTConnect", "Got: \"" + id + "\"");
+
+                if (ActivityCompat.checkSelfPermission(this, android.Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
+                    Log.i("BTConnect", "No permission");
+                    return;
+                }
+
+
+                btManager.connect(id);
 
             }
     );

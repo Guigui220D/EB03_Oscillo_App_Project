@@ -4,59 +4,45 @@ import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.recyclerview.widget.RecyclerView;
 
+import android.bluetooth.BluetoothAdapter;
+import android.bluetooth.BluetoothDevice;
+import android.content.BroadcastReceiver;
+import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.Menu;
+import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.ArrayAdapter;
+import android.widget.ListView;
+import android.widget.ProgressBar;
 import android.widget.TextView;
 
+import com.google.android.material.floatingactionbutton.FloatingActionButton;
+
+import java.security.Security;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 
 public class BluetoothConnectActivity extends AppCompatActivity {
 
-    class MyViewHolder extends RecyclerView.ViewHolder {
-        TextView textViewItem;
+    private enum Action { START, STOP };
 
-        public MyViewHolder(@NonNull View itemView) {
-            super(itemView);
-            textViewItem = itemView.findViewById(R.id.textViewItem);
-        }
-    }
+    private BluetoothAdapter m_bluetoothAdapter;
+    private boolean m_broadcastRegistered = false;
 
-    class MyItemAdapter extends RecyclerView.Adapter<MyViewHolder> {
-
-        private List<String> dataList;
-
-        public MyItemAdapter(List<String> dataList) {
-            this.dataList = dataList;
-        }
-
-        @NonNull
-        @Override
-        public MyViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
-            View view = LayoutInflater.from(parent.getContext()).inflate(R.layout.item_list, parent, false);
-            return new MyViewHolder(view);
-        }
-
-        @Override
-        public void onBindViewHolder(@NonNull MyViewHolder holder, int position) {
-            String data = dataList.get(position);
-            holder.textViewItem.setText(data);
-        }
-
-        @Override
-        public int getItemCount() {
-            return dataList.size();
-        }
-
-    }
-
-    private RecyclerView m_devList;
-    private MyItemAdapter m_adapter;
-
+    private ListView m_pairedList;
+    private ListView m_discoList;
+    private FloatingActionButton m_scanButton;
+    private ProgressBar m_progress;
+    private ArrayAdapter<String> m_pairedAdapter;
+    private ArrayAdapter<String> m_discoAdapter;
+    private boolean m_foundAny = false;
 
 
     @Override
@@ -66,15 +52,52 @@ public class BluetoothConnectActivity extends AppCompatActivity {
 
         getSupportActionBar().setTitle("Device connection menu");
 
-        ArrayList<String> list = new ArrayList<String>();
-        list.add("Test1");
-        list.add("Bonjour le monde");
-        list.add("Hello world");
+        m_pairedList = findViewById(R.id.pairedList);
+        m_discoList = findViewById(R.id.discoList);
+        m_pairedAdapter = new ArrayAdapter<String>(this, android.R.layout.simple_list_item_1);
+        m_discoAdapter = new ArrayAdapter<String>(this, android.R.layout.simple_list_item_1);
+        m_pairedList.setAdapter(m_pairedAdapter);
+        m_discoList.setAdapter(m_discoAdapter);
 
-        m_adapter = new MyItemAdapter(list);
+        m_pairedList.setOnItemClickListener((list, item, c, d) -> {
+            TextView t = (TextView)item;
+            onItemClick((String)t.getText());
+        });
+        m_discoList.setOnItemClickListener((list, item, c, d) -> {
+            TextView t = (TextView)item;
+            onItemClick((String)t.getText());
+        });
 
-        m_devList = findViewById(R.id.deviceList);
-        m_devList.setAdapter(m_adapter);
+        m_discoAdapter.add("No device found yet");
+
+        m_scanButton = findViewById(R.id.scanButton);
+        m_scanButton.setOnClickListener((a) -> btScan(Action.START));
+
+        m_progress = findViewById(R.id.progressBar);
+
+        // création de la liste des périphériques liés
+        m_bluetoothAdapter = BluetoothAdapter.getDefaultAdapter();
+        if(m_bluetoothAdapter != null) {
+            Set<BluetoothDevice> pairedDevices = m_bluetoothAdapter.getBondedDevices();
+
+            if (pairedDevices.size() > 0) {
+                for (BluetoothDevice pairedDevice : pairedDevices) {
+                    m_pairedAdapter.add(pairedDevice.getName() + "\n" + pairedDevice.getAddress());
+                }
+            } else {
+                m_pairedAdapter.add("No paired device available");
+            }
+        }
+    }
+
+    private void onItemClick(String device) {
+        Log.i("BT", "Chosen " + device);
+
+        Intent intent = new Intent();
+        intent.putExtra("chosen", device);
+        setResult(RESULT_OK, intent);
+
+        finish();
     }
 
     @Override
@@ -91,4 +114,67 @@ public class BluetoothConnectActivity extends AppCompatActivity {
         //intent.putExtra -- todo
         setResult(RESULT_OK, intent);
     }
+
+    @Override
+    public boolean onOptionsItemSelected(@NonNull MenuItem item) {
+        onBackPressed();
+        return super.onOptionsItemSelected(item);
+    }
+
+    private void btScan(Action startstop) {
+        if (startstop == Action.START) {
+            Log.i("BT", "Start scan");
+
+            IntentFilter filter = new IntentFilter();
+
+            filter.addAction(BluetoothAdapter.ACTION_DISCOVERY_FINISHED);
+            filter.addAction(BluetoothDevice.ACTION_FOUND);
+
+            registerReceiver(m_broadcastReceiver, filter);
+
+            m_discoAdapter.clear();
+            m_discoAdapter.add("No device found yet");
+            m_foundAny = false;
+            m_bluetoothAdapter.startDiscovery();
+
+            m_scanButton.setVisibility(View.GONE);
+            m_progress.setVisibility(View.VISIBLE);
+        } else { // Action.STOP
+            m_scanButton.setVisibility(View.VISIBLE);
+            m_progress.setVisibility(View.GONE);
+        }
+    }
+    private BroadcastReceiver m_broadcastReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            switch (intent.getAction()) {
+                case BluetoothAdapter.ACTION_DISCOVERY_FINISHED:
+                    Log.i("BT", "Discovery finished");
+                    btScan(Action.STOP);
+                    break;
+
+                case BluetoothDevice.ACTION_FOUND:
+                    BluetoothDevice dev = intent.getExtras().getParcelable(BluetoothDevice.EXTRA_DEVICE);
+                    String id = dev.getAddress();
+                    String name = dev.getName();
+                    if (name == null)
+                        name = "Unknown";
+                    String text = name + "\n" + id;
+
+                    Log.i("BT", "Found device " + id);
+
+                    if (!m_foundAny) {
+                        m_foundAny = true;
+                        m_discoAdapter.clear();
+                    }
+                    if (m_discoAdapter.getPosition(text) == -1)
+                        m_discoAdapter.add(text);
+
+                    break;
+            }
+
+            // TODO: forbid screen rotation in this activity
+        }
+    };
+
 }
