@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <declare-styleable name="CircularDial">
+        <attr name = "outline" format = "dimension"/>
+        <attr name = "displayDiameter" format = "dimension"/>
+        <attr name = "diameter" format = "dimension"/>
+        <attr name = "tickThickness" format = "dimension"/>
+    </declare-styleable>
+</resources>

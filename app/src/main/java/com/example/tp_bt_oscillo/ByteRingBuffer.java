@@ -11,7 +11,7 @@ import java.nio.charset.StandardCharsets;
 
 /**
  * ByteRingBuffer: buffer circulaire d'octets
- * Guillaume DEREX
+ * @author Guillaume DEREX
  */
 public class ByteRingBuffer {
 
